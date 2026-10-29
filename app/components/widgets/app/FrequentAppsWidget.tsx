@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { WidgetProps } from '@/app/types/widgets';
 import { useApps } from '@/app/hooks/useApps';
 import { AppTile } from '@/app/components/apps/AppTile';
@@ -11,13 +11,13 @@ import { RotateCcw } from 'lucide-react';
 
 export function FrequentAppsWidget({ widget, isEditMode, onRemove }: WidgetProps) {
     const { apps, loading } = useApps();
-    const [frequentApps, setFrequentApps] = useState<App[]>([]);
+    const [usageVersion, setUsageVersion] = useState(0);
 
-    const refreshFrequent = useCallback(() => {
+    const frequentApps = useMemo(() => {
+        void usageVersion;
         // If in preview mode (id='preview'), show mock data
         if (widget.id === 'preview') {
-            setFrequentApps(apps.slice(0, 4));
-            return;
+            return apps.slice(0, 4);
         }
 
         if (!loading && apps.length > 0) {
@@ -44,15 +44,15 @@ export function FrequentAppsWidget({ widget, isEditMode, onRemove }: WidgetProps
                 displayApps = [...displayApps, ...others];
             }
 
-            setFrequentApps(displayApps);
+            return displayApps;
         }
-    }, [apps, loading, widget.id]);
+
+        return [];
+    }, [apps, loading, widget.id, usageVersion]);
 
     useEffect(() => {
-        refreshFrequent();
-
         const handleAppUsed = () => {
-            refreshFrequent();
+            setUsageVersion(v => v + 1);
         };
 
         window.addEventListener('homelab_app_used', handleAppUsed);
@@ -62,13 +62,13 @@ export function FrequentAppsWidget({ widget, isEditMode, onRemove }: WidgetProps
             window.removeEventListener('homelab_app_used', handleAppUsed);
             window.removeEventListener('storage', handleAppUsed);
         };
-    }, [refreshFrequent]);
+    }, []);
 
     const handleReset = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (window.confirm('Reset frequently visited apps history?')) {
             usageTracker.clearUsage();
-            refreshFrequent();
+            setUsageVersion(v => v + 1);
         }
     };
 

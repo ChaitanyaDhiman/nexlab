@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import '@testing-library/jest-dom'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Sidebar } from '../app/components/layout/Sidebar'
@@ -7,6 +8,7 @@ jest.mock('lucide-react', () => ({
     Home: () => <div data-testid="icon-home" />,
     LayoutGrid: () => <div data-testid="icon-apps" />,
     BarChart2: () => <div data-testid="icon-analytics" />,
+    RefreshCw: () => <div data-testid="icon-updates" />,
     Settings: () => <div data-testid="icon-settings" />,
     Menu: () => <div data-testid="icon-menu" />,
 }));
@@ -54,6 +56,7 @@ describe('Sidebar', () => {
         expect(screen.getByText('Home')).toBeInTheDocument();
         expect(screen.getByText('Apps')).toBeInTheDocument();
         expect(screen.getByText('Analytics')).toBeInTheDocument();
+        expect(screen.getByText('Updates')).toBeInTheDocument();
         expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 

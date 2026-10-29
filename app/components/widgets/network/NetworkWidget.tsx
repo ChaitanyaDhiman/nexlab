@@ -3,7 +3,7 @@
 import { WidgetProps } from '@/app/types/widgets';
 import { BaseWidget } from '@/app/components/widgets/BaseWidget';
 import { useSystem } from '@/app/contexts/SystemContext';
-import { ArrowDown, ArrowUp, Activity, Wifi } from 'lucide-react';
+import { ArrowDown, ArrowUp, Activity } from 'lucide-react';
 
 export function NetworkWidget({ isEditMode, onRemove }: WidgetProps) {
     const { stats } = useSystem();

@@ -23,8 +23,7 @@ import {
     Wifi,
     Clock,
     Terminal,
-    ShieldCheck,
-    Radio
+    ShieldCheck
 } from 'lucide-react';
 
 function getContrastTextColor(hexColor?: string): string {

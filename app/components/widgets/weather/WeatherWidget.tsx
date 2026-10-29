@@ -3,7 +3,7 @@
 import { BaseWidget } from '../BaseWidget';
 import { WidgetProps } from '@/app/types/widgets';
 import { useEffect, useState, useCallback } from 'react';
-import { Cloud, CloudRain, CloudSnow, Sun, CloudDrizzle, Wind, CloudFog, CloudLightning, RefreshCw, MapPin, Search, Check, X } from 'lucide-react';
+import { Cloud, CloudRain, CloudSnow, Sun, CloudDrizzle, Wind, CloudFog, CloudLightning, RefreshCw, MapPin, Check, X } from 'lucide-react';
 
 interface WeatherData {
     temperature: number;

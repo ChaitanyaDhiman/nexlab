@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ThemeColors, THEMES } from './themes';
+import { ThemeColors } from './themes';
 
 const THEMES_CONFIG_PATH = path.join(process.cwd(), 'config/themes.json');
 
