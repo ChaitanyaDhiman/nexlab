@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { ServiceHealthIndicator } from "@/app/components/apps/ServiceHealthIndicator";
 import { getIconComponent } from "@/app/lib/iconUtils";
+import { usageTracker } from "@/app/lib/usageTracker";
 import { createElement } from "react";
 
 interface AppTileProps {
@@ -15,6 +16,10 @@ export function AppTile({ app, tileSize = 'medium' }: AppTileProps) {
     const IconComponent = getIconComponent(app.icon);
     const isSmall = tileSize === 'small';
 
+    const handleClick = () => {
+        usageTracker.trackAppOpen(app.id);
+    };
+
     return (
         <motion.div
             whileHover={{ scale: 1.02 }}
@@ -25,6 +30,7 @@ export function AppTile({ app, tileSize = 'medium' }: AppTileProps) {
             <Link
                 href={app.url}
                 target="_blank"
+                onClick={handleClick}
                 className={`block h-full w-full relative ${isSmall ? 'flex items-center gap-3' : ''}`}
             >
                 <div className={`rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors ${isSmall ? 'p-2' : 'p-3 mb-4 inline-block'

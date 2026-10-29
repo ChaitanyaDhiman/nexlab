@@ -5,6 +5,7 @@ import { Sidebar, TabId } from "./Sidebar";
 import { HomeView } from "@/app/components/views/HomeView";
 import { AppsView } from "@/app/components/views/AppsView";
 import { AnalyticsView } from "@/app/components/views/AnalyticsView";
+import { UpdatesView } from "@/app/components/views/UpdatesView";
 import { SettingsView } from "@/app/components/views/SettingsView";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -41,6 +42,7 @@ export function AppShell() {
                             {activeTab === 'home' && <HomeView />}
                             {activeTab === 'apps' && <AppsView onNavigateToSettings={navigateToAppsManagement} />}
                             {activeTab === 'analytics' && <AnalyticsView />}
+                            {activeTab === 'updates' && <UpdatesView />}
                             {activeTab === 'settings' && <SettingsView initialTab={settingsTab} />}
                         </motion.div>
                     </AnimatePresence>

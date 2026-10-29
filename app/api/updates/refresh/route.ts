@@ -8,78 +8,97 @@ const execAsync = promisify(exec);
 
 export const dynamic = 'force-dynamic';
 
-// Trigger file path - same location as update-agent uses
 const TRIGGER_FILE = '/data/trigger-refresh';
+const UPDATE_AGENT_URL = process.env.UPDATE_AGENT_URL || (fs.existsSync('/.dockerenv') ? 'http://update-agent:5000' : 'http://localhost:5000');
 
 /**
  * POST /api/updates/refresh
- * Triggers an immense update check.
- * - Docker: Creates a trigger file for the sidecar agent.
- * - Host: Runs `apt-get update` directly.
+ * Triggers package list refresh.
+ * Calls update-agent if reachable, or writes trigger file, or runs directly on host.
  */
-export async function POST() {
-    const isDocker = fs.existsSync('/.dockerenv');
-
+export async function POST(req: Request) {
+    let refresh = true;
+    let stream = true;
     try {
-        if (!isDocker) {
-            // On host, try to run apt-get update directly
-            // Try with sudo first, then without if that fails (though without usually fails for update)
-            // This might take time (10-30s), so we await it.
+        const body = await req.json();
+        if (typeof body.refresh === 'boolean') {
+            refresh = body.refresh;
+        }
+        if (typeof body.stream === 'boolean') {
+            stream = body.stream;
+        }
+    } catch {
+        // Body is optional
+    }
+
+    // 1. Try agent HTTP endpoint first
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout for apt update
+
+        const res = await fetch(`${UPDATE_AGENT_URL}/check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh, stream }),
+            signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            const data = await res.json();
+            return NextResponse.json({
+                success: true,
+                message: refresh ? 'Repositories refreshed and updates checked' : 'Update status checked',
+                data: data.data,
+                timestamp: new Date().toISOString(),
+            });
+        }
+    } catch {
+        // Agent not reachable via HTTP, proceed to file/direct fallback
+    }
+
+    // 2. Docker Mode fallback: write trigger file
+    const isDocker = fs.existsSync('/.dockerenv');
+    if (isDocker) {
+        try {
+            const triggerDir = path.dirname(TRIGGER_FILE);
+            if (!fs.existsSync(triggerDir)) {
+                fs.mkdirSync(triggerDir, { recursive: true });
+            }
+            fs.writeFileSync(TRIGGER_FILE, new Date().toISOString());
+
+            return NextResponse.json({
+                success: true,
+                message: 'Refresh triggered via sidecar agent trigger file',
+                timestamp: new Date().toISOString(),
+            });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            return NextResponse.json(
+                { success: false, error: msg, message: 'Failed to write trigger file' },
+                { status: 500 }
+            );
+        }
+    }
+
+    // 3. Local/Host Mode fallback
+    try {
+        if (refresh) {
             try {
-                // Try sudo non-interactive first
-                try {
-                    await execAsync('sudo -n apt-get update');
-                } catch (sudoError) {
-                    // Fallback to normal command if sudo fails or not available
-                    // This will likely fail with permission denied, but let's try
-                    console.log('sudo apt-get update failed, trying without sudo:', sudoError);
-                    await execAsync('apt-get update');
-                }
-
-                return NextResponse.json({
-                    success: true,
-                    message: 'Package list updated successfully',
-                    timestamp: new Date().toISOString(),
-                });
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } catch (error: any) {
-                console.error('Failed to update package list:', error);
-
-                const isPermissionError = error.message.includes('Permission denied') || error.message.includes('E: Could not open lock file');
-
-                return NextResponse.json({
-                    success: false,
-                    error: isPermissionError
-                        ? 'Permission denied. Please configure passwordless sudo for apt-get update: "username ALL=(ALL) NOPASSWD: /usr/bin/apt-get update"'
-                        : 'Failed to update package list: ' + error.message,
-                    timestamp: new Date().toISOString(),
-                }, { status: isPermissionError ? 403 : 500 });
+                await execAsync('sudo -n apt-get update');
+            } catch {
+                await execAsync('apt-get update');
             }
         }
-
-        // Docker Mode
-        const triggerDir = path.dirname(TRIGGER_FILE);
-
-        if (!fs.existsSync(triggerDir)) {
-            fs.mkdirSync(triggerDir, { recursive: true });
-        }
-
-        fs.writeFileSync(TRIGGER_FILE, new Date().toISOString());
-
         return NextResponse.json({
             success: true,
-            message: 'Refresh triggered - update check will run within seconds',
+            message: 'Package list updated successfully on host',
             timestamp: new Date().toISOString(),
         });
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
-            {
-                success: false,
-                error: errorMessage,
-                message: 'Failed to trigger refresh',
-                timestamp: new Date().toISOString(),
-            },
+            { success: false, error: errorMessage, message: 'Failed to update package list' },
             { status: 500 }
         );
     }

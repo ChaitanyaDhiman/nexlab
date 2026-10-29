@@ -1,13 +1,14 @@
 'use client';
 
-import { Clock12, Clock4, Globe, Calendar, Eye, Sun, LayoutGrid, HardDrive, Info } from 'lucide-react';
+import { Clock12, Clock4, Globe, Calendar, Eye, Sun, LayoutGrid, HardDrive, Info, Palette } from 'lucide-react';
 import { useSettings } from '@/app/contexts/SettingsContext';
 import { useState, useEffect } from 'react';
 import { AppsManager } from '@/app/components/settings/AppsManager';
 import { StorageManager } from '@/app/components/settings/StorageManager';
 import { AboutSection } from '@/app/components/settings/AboutSection';
+import { ThemeStudio } from '@/app/components/settings/ThemeStudio';
 
-type SettingsTab = 'appearance' | 'apps' | 'storage' | 'about';
+type SettingsTab = 'appearance' | 'themes' | 'apps' | 'storage' | 'about';
 
 interface SettingsViewProps {
     initialTab?: SettingsTab;
@@ -17,7 +18,7 @@ export function SettingsView({ initialTab = 'appearance' }: SettingsViewProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
     const [previewTime, setPreviewTime] = useState('');
     const [previewDate, setPreviewDate] = useState('');
-    const { timeFormat, setTimeFormat, dateFormat, setDateFormat, theme, setTheme, getEffectiveTimeFormat } = useSettings();
+    const { timeFormat, setTimeFormat, dateFormat, setDateFormat, getEffectiveTimeFormat } = useSettings();
 
     const effectiveFormat = getEffectiveTimeFormat();
 
@@ -79,6 +80,21 @@ export function SettingsView({ initialTab = 'appearance' }: SettingsViewProps) {
                         Appearance
                     </div>
                     {activeTab === 'appearance' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('themes')}
+                    className={`px-4 py-3 font-medium transition-colors relative whitespace-nowrap ${activeTab === 'themes'
+                        ? 'text-primary'
+                        : 'text-gray-400 hover:text-white'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Palette className="w-4 h-4" />
+                        Theme Studio
+                    </div>
+                    {activeTab === 'themes' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
                     )}
                 </button>
@@ -150,116 +166,91 @@ export function SettingsView({ initialTab = 'appearance' }: SettingsViewProps) {
                         </div>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* Theme Settings */}
-                        <section className="bg-surface/30 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
-                            <div className="flex items-center gap-2 text-white mb-6">
-                                <Sun className="w-5 h-5" />
-                                <h2 className="text-lg font-semibold">Appearance</h2>
-                            </div>
-
-                            <div className="flex items-center justify-between p-4 bg-surface-highlight/5 rounded-xl border border-white/5">
-                                <span className="text-gray-300 font-medium">Theme Mode</span>
-                                <div className="flex items-center gap-3">
-                                    <span className={`text-sm ${theme === 'light' ? 'text-primary font-bold' : 'text-gray-500'}`}>Light</span>
-                                    <button
-                                        onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                                        className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                                        style={{
-                                            backgroundColor: theme === 'dark' ? '#4f46e5' : '#cbd5e1'
-                                        }}
-                                    >
-                                        <span
-                                            className="inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform"
-                                            style={{
-                                                transform: theme === 'dark' ? 'translateX(1.5rem)' : 'translateX(0.25rem)'
-                                            }}
-                                        />
-                                    </button>
-                                    <span className={`text-sm ${theme === 'dark' ? 'text-primary font-bold' : 'text-gray-500'}`}>Dark</span>
-                                </div>
-                            </div>
-                        </section>
-
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                         {/* Time Format */}
-                        <section className="bg-surface/30 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-2 text-white">
-                                    <Clock12 className="w-5 h-5" />
-                                    <h2 className="text-lg font-semibold">Time Format</h2>
+                        <section className="bg-surface/30 border border-white/5 rounded-2xl p-6 backdrop-blur-sm h-full flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-2 text-white">
+                                        <Clock12 className="w-5 h-5" />
+                                        <h2 className="text-lg font-semibold">Time Format</h2>
+                                    </div>
+                                    {timeFormat === 'auto' && (
+                                        <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20">
+                                            System: {effectiveFormat === '12h' ? '12-hour' : '24-hour'}
+                                        </span>
+                                    )}
                                 </div>
-                                {timeFormat === 'auto' && (
-                                    <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded border border-primary/20">
-                                        System: {effectiveFormat === '12h' ? '12-hour' : '24-hour'}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                {[
-                                    { id: 'auto', label: 'Auto', icon: Globe },
-                                    { id: '12h', label: '12-hour', icon: Clock12 },
-                                    { id: '24h', label: '24-hour', icon: Clock4 },
-                                ].map((option) => {
-                                    const Icon = option.icon;
-                                    const isSelected = timeFormat === option.id;
-                                    return (
-                                        <button
-                                            key={option.id}
-                                            onClick={() => setTimeFormat(option.id as 'auto' | '12h' | '24h')}
-                                            className={`
-                                                flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-xl transition-all cursor-pointer border-2
-                                                ${isSelected
-                                                    ? 'bg-primary/10 text-primary border-primary/50 shadow-lg shadow-primary/5'
-                                                    : 'bg-surface-highlight/50 text-gray-400 border-transparent hover:bg-surface-highlight hover:text-white hover:border-white/10'
-                                                }
-                                            `}
-                                        >
-                                            <Icon className="w-5 h-5" />
-                                            <span className="text-sm font-medium">{option.label}</span>
-                                        </button>
-                                    );
-                                })}
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[
+                                        { id: 'auto', label: 'Auto', icon: Globe },
+                                        { id: '12h', label: '12-hour', icon: Clock12 },
+                                        { id: '24h', label: '24-hour', icon: Clock4 },
+                                    ].map((option) => {
+                                        const Icon = option.icon;
+                                        const isSelected = timeFormat === option.id;
+                                        return (
+                                            <button
+                                                key={option.id}
+                                                onClick={() => setTimeFormat(option.id as 'auto' | '12h' | '24h')}
+                                                className={`
+                                                    flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-xl transition-all cursor-pointer border-2
+                                                    ${isSelected
+                                                        ? 'bg-primary/10 text-primary border-primary/50 shadow-lg shadow-primary/5'
+                                                        : 'bg-surface-highlight/50 text-gray-400 border-transparent hover:bg-surface-highlight hover:text-white hover:border-white/10'
+                                                    }
+                                                `}
+                                            >
+                                                <Icon className="w-5 h-5" />
+                                                <span className="text-sm font-medium">{option.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </section>
 
                         {/* Date Format */}
-                        <section className="bg-surface/30 border border-white/5 rounded-2xl p-6 backdrop-blur-sm md:col-span-2">
-                            <div className="flex items-center gap-2 text-white mb-6">
-                                <Calendar className="w-5 h-5" />
-                                <h2 className="text-lg font-semibold">Date Format</h2>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {[
-                                    { id: 'auto', label: 'Auto', desc: 'System Default' },
-                                    { id: 'short', label: 'Short', desc: 'MM/DD/YY' },
-                                    { id: 'medium', label: 'Medium', desc: 'MMM DD, YYYY' },
-                                    { id: 'long', label: 'Long', desc: 'Month DD, YYYY' },
-                                ].map((option) => {
-                                    const isSelected = dateFormat === option.id;
-                                    return (
-                                        <button
-                                            key={option.id}
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            onClick={() => setDateFormat(option.id as any)}
-                                            className={`
-                                                flex flex-col items-start p-4 rounded-xl transition-all cursor-pointer border-2 w-full
-                                                ${isSelected
-                                                    ? 'bg-primary/10 text-primary border-primary/50 shadow-lg shadow-primary/5'
-                                                    : 'bg-surface-highlight/50 text-gray-400 border-transparent hover:bg-surface-highlight hover:text-white hover:border-white/10'
-                                                }
-                                            `}
-                                        >
-                                            <span className="text-sm font-bold mb-1">{option.label}</span>
-                                            <span className="text-xs opacity-70">{option.desc}</span>
-                                        </button>
-                                    );
-                                })}
+                        <section className="bg-surface/30 border border-white/5 rounded-2xl p-6 backdrop-blur-sm h-full flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 text-white mb-6">
+                                    <Calendar className="w-5 h-5" />
+                                    <h2 className="text-lg font-semibold">Date Format</h2>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { id: 'auto', label: 'Auto', desc: 'System Default' },
+                                        { id: 'short', label: 'Short', desc: 'MM/DD/YY' },
+                                        { id: 'medium', label: 'Medium', desc: 'MMM DD, YYYY' },
+                                        { id: 'long', label: 'Long', desc: 'Month DD, YYYY' },
+                                    ].map((option) => {
+                                        const isSelected = dateFormat === option.id;
+                                        return (
+                                            <button
+                                                key={option.id}
+                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                onClick={() => setDateFormat(option.id as any)}
+                                                className={`
+                                                    flex flex-col items-start p-3 rounded-xl transition-all cursor-pointer border-2 w-full
+                                                    ${isSelected
+                                                        ? 'bg-primary/10 text-primary border-primary/50 shadow-lg shadow-primary/5'
+                                                        : 'bg-surface-highlight/50 text-gray-400 border-transparent hover:bg-surface-highlight hover:text-white hover:border-white/10'
+                                                    }
+                                                `}
+                                            >
+                                                <span className="text-sm font-bold mb-0.5">{option.label}</span>
+                                                <span className="text-xs opacity-70">{option.desc}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </section>
                     </div>
                 </div>
             )}
 
+            {activeTab === 'themes' && <ThemeStudio />}
             {activeTab === 'apps' && <AppsManager />}
             {activeTab === 'storage' && <StorageManager />}
             {activeTab === 'about' && <AboutSection />}

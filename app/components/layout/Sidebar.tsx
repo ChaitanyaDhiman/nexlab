@@ -1,11 +1,11 @@
 "use client";
 
-import { Home, LayoutGrid, BarChart2, Settings, Menu } from "lucide-react";
+import { Home, LayoutGrid, BarChart2, Settings, Menu, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { NexLabIcon } from "@/app/components/icons/NexLabIcon";
 
-export type TabId = 'home' | 'apps' | 'analytics' | 'settings';
+export type TabId = 'home' | 'apps' | 'analytics' | 'updates' | 'settings';
 
 interface SidebarProps {
     activeTab: TabId;
@@ -26,7 +26,7 @@ export function Sidebar({ activeTab, onTabChange, isExpanded, onToggleExpand }: 
         return () => window.removeEventListener('resize', handleResize);
     }, [isExpanded, onToggleExpand]);
 
-    // Check for updates
+    // Check for app updates (GitHub release)
     const [updateAvailable, setUpdateAvailable] = useState(false);
     useEffect(() => {
         const checkUpdates = async () => {
@@ -49,10 +49,40 @@ export function Sidebar({ activeTab, onTabChange, isExpanded, onToggleExpand }: 
         return () => clearInterval(interval);
     }, []);
 
+    // Check for host OS system updates
+    const [systemUpdates, setSystemUpdates] = useState<{ total: number; security: number; reboot: boolean }>({
+        total: 0,
+        security: 0,
+        reboot: false,
+    });
+
+    useEffect(() => {
+        const fetchSystemUpdates = async () => {
+            try {
+                const res = await fetch('/api/updates');
+                const json = await res.json();
+                if (json.success && json.data) {
+                    setSystemUpdates({
+                        total: json.data.updatesAvailable || 0,
+                        security: json.data.securityUpdates || 0,
+                        reboot: json.data.rebootRequired || false,
+                    });
+                }
+            } catch {
+                // ignore
+            }
+        };
+
+        fetchSystemUpdates();
+        const interval = setInterval(fetchSystemUpdates, 60000); // 1 min poll
+        return () => clearInterval(interval);
+    }, []);
+
     const navItems = [
         { id: 'home', label: 'Home', icon: Home },
         { id: 'apps', label: 'Apps', icon: LayoutGrid },
         { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+        { id: 'updates', label: 'Updates', icon: RefreshCw },
         { id: 'settings', label: 'Settings', icon: Settings },
     ] as const;
 
@@ -108,8 +138,11 @@ export function Sidebar({ activeTab, onTabChange, isExpanded, onToggleExpand }: 
                                     }
                                 `}
                             >
-                                <motion.div layout className="flex items-center justify-center shrink-0">
+                                <motion.div layout className="relative flex items-center justify-center shrink-0">
                                     <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : ''} transition-colors`} />
+                                    {!isExpanded && item.id === 'updates' && systemUpdates.total > 0 && (
+                                        <span className={`w-2 h-2 rounded-full absolute -top-1 -right-1 ${systemUpdates.security > 0 ? 'bg-red-400' : 'bg-primary'} animate-pulse`} />
+                                    )}
                                 </motion.div>
 
                                 <AnimatePresence mode="wait">
@@ -126,9 +159,24 @@ export function Sidebar({ activeTab, onTabChange, isExpanded, onToggleExpand }: 
                                     )}
                                 </AnimatePresence>
 
+                                {isExpanded && item.id === 'updates' && systemUpdates.total > 0 && (
+                                    <motion.span
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className={`ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                            systemUpdates.security > 0
+                                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                : 'bg-primary/20 text-primary border border-primary/30'
+                                        }`}
+                                    >
+                                        {systemUpdates.total}
+                                    </motion.span>
+                                )}
+
                                 {!isExpanded && (
                                     <div className="absolute left-full ml-2 px-3 py-1.5 bg-surface-highlight rounded-md text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none shadow-lg">
                                         {item.label}
+                                        {item.id === 'updates' && systemUpdates.total > 0 && ` (${systemUpdates.total})`}
                                     </div>
                                 )}
                             </motion.button>

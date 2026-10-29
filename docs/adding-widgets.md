@@ -16,12 +16,13 @@ Adding a widget involves 3 main steps:
 Create a new directory in `app/components/widgets/` for your widget (e.g., `app/components/widgets/mytime/`).
 Create a file `MyTimeWidget.tsx`.
 
-It must accept `WidgetProps` and wrap its content in `BaseWidget`.
+It must accept `WidgetProps` and wrap its content in `BaseWidget`. You can also pass header buttons or status badges via the `actions` prop.
 
 ```tsx
 // app/components/widgets/mytime/MyTimeWidget.tsx
 import { BaseWidget } from '@/app/components/widgets/BaseWidget';
 import { WidgetProps } from '@/app/types/widgets';
+import { RefreshCw } from 'lucide-react';
 
 export function MyTimeWidget({ widget, isEditMode, onRemove }: WidgetProps) {
     return (
@@ -29,6 +30,15 @@ export function MyTimeWidget({ widget, isEditMode, onRemove }: WidgetProps) {
             title="My Time" 
             isEditMode={isEditMode} 
             onRemove={onRemove}
+            actions={
+                <button 
+                    onClick={() => console.log('Action triggered')}
+                    className="p-1 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                    title="Refresh"
+                >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+            }
         >
             <div className="flex items-center justify-center h-full">
                 <h1 className="text-2xl font-bold text-white">Hello World</h1>
@@ -62,10 +72,10 @@ export const WIDGET_METADATA: Record<WidgetType, WidgetMetadata> = {
         type: 'my-time',
         name: 'My Time',
         description: 'A custom time widget',
-        category: 'Time', // This puts it in the "Time" category sidebar
+        category: 'Time', // Categories: 'System' | 'Apps' | 'Media' | 'Utilities'
         singleton: false, // Set to true if only one instance should be allowed
         icon: 'Clock', // Lucide icon name
-        defaultSize: { w: 4, h: 3 },
+        defaultSize: { w: 4, h: 2 },
         minSize: { w: 2, h: 2 }
     }
 };
@@ -73,20 +83,30 @@ export const WIDGET_METADATA: Record<WidgetType, WidgetMetadata> = {
 
 ### 4. Map the Component
 
-Finally, map the type string to the component in `app/components/home/WidgetGrid.tsx`.
+Map the type string to your component in both the main grid and the widget picker modal:
 
-```tsx
-// app/components/home/WidgetGrid.tsx
-import { MyTimeWidget } from '@/app/components/widgets/mytime/MyTimeWidget';
+1. **`app/components/home/WidgetGrid.tsx`**:
+   ```tsx
+   import { MyTimeWidget } from '@/app/components/widgets/mytime/MyTimeWidget';
 
-const WIDGET_COMPONENTS: Record<WidgetType, React.ComponentType<any>> = {
-    // ...
-    'my-time': MyTimeWidget,
-};
-```
+   const WIDGET_COMPONENTS: Record<WidgetType, React.ComponentType<any>> = {
+       // ...
+       'my-time': MyTimeWidget,
+   };
+   ```
+
+2. **`app/components/home/WidgetPicker.tsx`** (for modal preview cards):
+   ```tsx
+   import { MyTimeWidget } from '@/app/components/widgets/mytime/MyTimeWidget';
+
+   const WIDGET_PREVIEWS: Partial<Record<WidgetType, React.ComponentType<any>>> = {
+       // ...
+       'my-time': MyTimeWidget,
+   };
+   ```
 
 ## Icons
-To add a new icon support, update `getWidgetIcon` in `app/lib/widgetRegistry.ts` if the icon isn't already imported/mapped.
+To add a new icon, update `getWidgetIcon` in `app/lib/widgetRegistry.ts` if the icon isn't already imported and mapped.
 
 ## That's it!
 Your widget will now appear in the "Add Widget" picker under the category you specified.

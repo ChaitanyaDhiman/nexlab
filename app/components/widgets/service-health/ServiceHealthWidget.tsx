@@ -2,8 +2,8 @@
 
 import { BaseWidget } from '../BaseWidget';
 import { WidgetProps } from '@/app/types/widgets';
-import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface Service {
     id: string;
@@ -14,48 +14,67 @@ interface Service {
 export function ServiceHealthWidget({ isEditMode, onRemove }: WidgetProps) {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchServices = useCallback(async () => {
+        try {
+            const appsResponse = await fetch('/api/apps', { cache: 'no-store' });
+            if (!appsResponse.ok) throw new Error('Failed to fetch apps');
+            const appsData = await appsResponse.json();
+
+            const healthResponse = await fetch('/api/health', { cache: 'no-store' });
+            if (!healthResponse.ok) throw new Error('Failed to fetch health');
+            const healthData = await healthResponse.json();
+
+            const allApps = [
+                ...(appsData.uncategorizedApps || []),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ...(appsData.categories || []).flatMap((cat: any) => cat.apps)
+            ];
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const servicesWithHealth = allApps.map((app: any) => ({
+                id: app.id,
+                name: app.name,
+                status: healthData.data?.[app.id]?.status || 'offline'
+            }));
+
+            setServices(servicesWithHealth);
+        } catch (error) {
+            console.error('Error fetching service health:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const fetchServices = async () => {
-            try {
-                const appsResponse = await fetch('/api/apps');
-                if (!appsResponse.ok) throw new Error('Failed to fetch apps');
-                const appsData = await appsResponse.json();
-
-                const healthResponse = await fetch('/api/health');
-                if (!healthResponse.ok) throw new Error('Failed to fetch health');
-                const healthData = await healthResponse.json();
-
-                const allApps = [
-                    ...(appsData.uncategorizedApps || []),
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    ...(appsData.categories || []).flatMap((cat: any) => cat.apps)
-                ];
-
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const servicesWithHealth = allApps.map((app: any) => ({
-                    id: app.id,
-                    name: app.name,
-                    status: healthData.data?.[app.id]?.status || 'offline'
-                }));
-
-                setServices(servicesWithHealth);
-            } catch (error) {
-                console.error('Error fetching service health:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchServices();
         const interval = setInterval(fetchServices, 30000);
-
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchServices]);
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        await fetchServices();
+    };
+
+    const actions = (
+        <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className={`p-1 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors ${
+                refreshing ? 'animate-spin text-blue-400' : ''
+            }`}
+            title="Refresh service health"
+        >
+            <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+    );
 
     if (loading) {
         return (
-            <BaseWidget title="Service Health" isEditMode={isEditMode} onRemove={onRemove}>
+            <BaseWidget title="Service Health" isEditMode={isEditMode} onRemove={onRemove} actions={actions}>
                 <div className="flex items-center justify-center h-full">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
@@ -71,7 +90,7 @@ export function ServiceHealthWidget({ isEditMode, onRemove }: WidgetProps) {
     const healthPercentage = totalServices > 0 ? (onlineServices / totalServices) * 100 : 0;
 
     return (
-        <BaseWidget title="Service Health" isEditMode={isEditMode} onRemove={onRemove}>
+        <BaseWidget title="Service Health" isEditMode={isEditMode} onRemove={onRemove} actions={actions}>
             <div className="flex flex-col h-full">
                 {/* Overview */}
                 <div className="flex items-center justify-center mb-4">

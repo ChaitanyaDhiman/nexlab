@@ -7,15 +7,16 @@ A secure, premium, and customizable dashboard for your local home server. Built 
 ## ✨ Features
 
 - 🚀 **Centralized Hub**: Single entry point for all your local services with optimized state management via React Context
-- 🎨 **Premium Design**: "Deep Space" theme with glassmorphism, animated backgrounds, and interactive hover effects
-- ⚡ **Optimized Monitoring**: CPU/GPU Gauges, Temperature circular monitors, and Network speed tracking
-- 🔄 **System Update Monitoring**: Track available OS updates and security patches with one-click package listing
-- 🏥 **Resilient Health Checks**: Real-time monitoring with "Internal-to-Public" fallback logic and tiered timeouts
+- 🎨 **In-Dashboard Theme Studio**: Switch between 8 curated palettes (Deep Space, Dracula, Nord, Catppuccin, Tokyo Night, Cyberpunk, Emerald Forest, Clean Light) or create custom themes with a real-time live preview sandbox and direct JSON import/export
+- ⚡ **Optimized Monitoring**: CPU/GPU Gauges, Temperature circular monitors, and real-time Network Throughput tracking
+- 🔄 **Dedicated Updates Center & Live Terminal**: Manage host OS updates (`apt update`, `apt upgrade -y`, `apt autoremove -y`, host reboot) directly from the UI with an embedded live streaming execution terminal
+- 🌦️ **HTTP-Resilient Weather Widget**: Automatic IP-based geolocation fallback for local HTTP dashboard origins, eliminating browser geolocation permission blocks with manual city override
+- ★ **Smart Frecency App Tracking**: Mozilla/browser-standard frecency algorithm (frequency + recency weighting) with real-time UI updates
+- 🏥 **Resilient Health Checks**: Real-time monitoring with "Internal-to-Public" fallback logic, tiered timeouts, and on-demand refresh buttons
 - 🐳 **Docker Integration**: Live container stats (CPU/Mem) and management via Portainer
 - 💾 **Storage Monitoring**: Bar and Pie chart visualizations for multiple drives
 - 📏 **Global Tile Sizes**: Customize the grid density (Compact, Standard, Comfort) to fit your screen and preference
 - ⏰ **Customizable Clock**: Toggle between 12-hour and 24-hour time formats with persistent preferences
-- 🐳 **Docker Integration**: Includes Docker Compose setup for essential homelab services
 - 🛡️ **Connectivity Transparency**: Visual markers (Globe icon) indicating when services are using fallback public routes
 - 🔒 **Secure Configuration**: Service URLs configured via environment variables with SSL verification bypass for internal Docker traffic
 - 📱 **Responsive Design**: Optimized for desktop, tablet, and mobile devices
@@ -61,7 +62,7 @@ This project includes two main components:
 - **Beszel** - Lightweight server monitoring with beautiful dashboards and GPU support
 
 See the [docker-services README](./docker-services/README.md) for detailed documentation on these services.
-See the [Documentation](/docs) folder for details on [Widgets](/docs/widgets.md) and [API](/docs/api_reference.md).
+See the [Documentation](/docs) folder for details on [Widgets](/docs/widgets.md), [API Reference](/docs/api_reference.md), and [Theming System](/docs/theming.md).
 
 ## 🚀 Quick Start
 
@@ -320,73 +321,75 @@ The dashboard includes real-time system monitoring using a high-performance poll
 - **Battery**: Detailed power metrics including charge %, health status, voltage, and power draw (requires `/sys` mount in Docker).
 - **Uptime**: System uptime in human-readable format.
 
-## 🔄 System Update Monitoring
+## 🔄 System Updates & Host Management
 
-The dashboard monitors host system updates using a secure **sidecar container architecture**:
+The dashboard includes a dedicated **Updates Center** (`/updates`) powered by an active `update-agent` sidecar container that can monitor, trigger, and execute host package updates in real-time.
 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│              Host System                │
-│  /var/lib/apt, /etc/apt (read-only)     │
-└─────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────┐
-│           update-agent                  │
-│       (sidecar container)               │
-│  - Checks for updates hourly            │
-│  - Writes status to shared volume       │
-└─────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────┐
-│           nextjs_dashboard              │
-│  - Reads update status from JSON        │
-│  - Can trigger manual refresh           │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                      Host System                       │
+│  - Linux Host APT System (dpkg, apt-get, reboot)       │
+└────────────────────────────────────────────────────────┘
+                           ▲
+             nsenter -t 1 (Host Namespaces)
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│                      update-agent                      │
+│                 (FastAPI Daemon :5000)                 │
+│  - Executes host commands via nsenter                  │
+│  - Runs `apt update`, `apt upgrade -y`, `autoremove`   │
+│  - Streams stdout/stderr via Server-Sent Events (SSE)  │
+└────────────────────────────────────────────────────────┘
+                           ▲
+                    HTTP REST & SSE
+                           ▼
+┌────────────────────────────────────────────────────────┐
+│                   Next.js Dashboard                    │
+│  - /updates View with Package Version Diffs            │
+│  - Embedded Live Execution Terminal (Auto-expanding)   │
+│  - System Updates Widget on Home Dashboard             │
+└────────────────────────────────────────────────────────┘
 ```
 
 ### Features
 
-- **Secure Design**: Only specific apt directories are mounted (not entire root filesystem)
-- **Real-Time Sync**: Optimized filesystem cache invalidation ensures container sees host changes immediately
-- **No Restart Required**: Manual refresh works without restarting containers (~6 seconds)
-- **Urgency Awareness**: Badges change color based on urgency:
-  - 🔴 **Critical**: Security updates available
-  - 🟡 **Warning**: 5+ regular updates pending
-  - 🔵 **Normal**: Pending minor updates
-- **Reboot Detection**: Clear visual alerts when a kernel or system reboot is required
-- **Manual Refresh**: Click "Refresh Status" to trigger an immediate update check (~7s)
-- **Deep Dive**: Expand to see detailed list of regular vs. security packages
-- **Live Animation**: Download icon pulses when updates are available
+- **Dedicated Updates Center**: A full-screen view listing all upgradable packages with current version, target version, architecture, and security badges.
+- **Live Terminal Execution**: An embedded xterm-style live execution console at the bottom of the page that streams real-time `apt` output line-by-line as commands run on the host.
+- **One-Click Actions**:
+  - 🔍 **Check Updates**: Runs `apt update` on the host to refresh mirrors and synchronizes package lists.
+  - 🔄 **Refresh Status**: Refetches and analyzes pending updates against the local package cache.
+  - ⚡ **Apply Updates**: Executes `apt-get upgrade -y && apt-get autoremove -y` inside host namespaces with confirmation protection.
+  - 🔁 **Reboot Host**: Safely triggers `/sbin/reboot` with confirmation dialogs.
+- **Security Awareness**: Badges distinguish critical security patches from regular updates.
+- **Reboot Detection**: Notifies users when `/var/run/reboot-required` is present on the host.
 
-### How It Works
+### API Endpoints
 
-1. **Update-agent** mounts host apt directories (read-only) and checks for updates hourly
-2. When you click **"Refresh Status"**:
-   - Creates a trigger file in the shared volume
-   - Agent detects trigger within 2 seconds
-   - Invalidates filesystem cache using `os.stat()` to see fresh host data
-   - Runs `apt-get upgrade --dry-run` against host's package state (~4s)
-   - Writes updated status to shared JSON file
-   - Dashboard fetches and displays new data
-3. **No container restart needed** - bind mounts update in real-time
-
-### Timestamps
-
-- **Last checked**: Shows when `apt update` was last run on the **host** (package cache freshness)
-- **Agent last ran**: Internal timestamp (not displayed in UI)
-- To get truly fresh package data, run `sudo apt update` on the host first
+- **`GET /api/updates`**: Returns current pending updates, security counts, package lists, and reboot status.
+- **`POST /api/updates/refresh`**: Triggers `apt update` and caches the refreshed package list.
+- **`POST /api/updates/apply`**: Triggers full system upgrade and package cleanup.
+- **`GET /api/updates/stream`**: Server-Sent Events (SSE) stream providing real-time stdout and execution state.
+- **`POST /api/updates/reboot`**: Initiates a host system reboot.
 
 ### Configuration
 
-The update-agent check interval can be configured via environment variable:
+In `docker-compose.yml`, the `update-agent` service is configured with host PID and privileges:
 
 ```yaml
-environment:
-  - CHECK_INTERVAL_SECONDS=3600  # Default: 1 hour
+  update-agent:
+    build:
+      context: ./update-agent
+      dockerfile: dockerfile
+    container_name: update-agent
+    privileged: true
+    pid: host
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./update-agent/update-check.py:/app/update-check.py:ro
 ```
 
 ## 🔄 Versioning & Auto-Updates
@@ -476,20 +479,61 @@ Returns system update status (available packages, security updates, reboot statu
     "updatesAvailable": 5,
     "securityUpdates": 2,
     "updatePackages": ["pkg1", "pkg2"],
-    "securityPackagesList": ["pkg1"],
-    "lastUpdateCheck": "2026-01-21T00:00:00Z"
+    "securityPackages": ["pkg1"],
+    "packages": [
+      {
+        "name": "curl",
+        "currentVersion": "7.88.1-10+deb12u8",
+        "newVersion": "7.88.1-10+deb12u9",
+        "architecture": "amd64",
+        "isSecurity": true
+      }
+    ],
+    "lastUpdateCheck": "2026-10-29T11:45:00Z"
   }
 }
 ```
 
 **`POST /api/updates/refresh`**
 
-Triggers an immediate update status refresh (Docker only).
+Runs `apt-get update` on host mirrors and synchronizes package status.
+
+**`POST /api/updates/apply`**
+
+Executes `apt-get upgrade -y && apt-get autoremove -y` inside host namespaces.
+
+**`GET /api/updates/stream`**
+
+Server-Sent Events (SSE) stream providing real-time line-by-line output of running update commands.
+
+**`POST /api/updates/reboot`**
+
+Safely triggers a host system reboot via `/sbin/reboot`.
+
+---
+
+### Weather
+
+**`GET /api/weather`**
+
+Returns current weather condition and temperature with automatic server IP-geolocation fallback (works seamlessly on insecure HTTP origins).
+
+Query parameters:
+- `lat` / `lon`: Optional latitude and longitude coordinates.
+- `city`: Optional city name (geocoded automatically via Open-Meteo).
 
 ```json
 {
   "success": true,
-  "message": "Refresh triggered - update check will run within seconds"
+  "data": {
+    "temperature": 21,
+    "description": "Clear sky",
+    "weatherCode": 0,
+    "windSpeed": 5.2,
+    "humidity": 45,
+    "isDay": true,
+    "location": "Dehradun, Uttarakhand"
+  }
 }
 ```
 
@@ -563,10 +607,10 @@ npm run lint     # Run ESLint
 
 ```bash
 # Check logs
-docker-compose logs nextjs-dashboard
+docker compose logs nextjs-dashboard
 
 # Rebuild container
-docker-compose up -d --build --force-recreate
+docker compose up -d --build --force-recreate
 ```
 
 ### Services Not Accessible
