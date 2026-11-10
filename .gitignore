@@ -60,3 +60,4 @@ config/widgets.json
 !config/apps.example.json
 !config/storage.example.json
 !config/widgets.example.json
+docs/SECURITY_AUDIT_AND_ROADMAP.md
