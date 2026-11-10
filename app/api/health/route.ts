@@ -47,8 +47,6 @@ export async function GET() {
             const startTime = performance.now();
             let usedFallback = false;
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const serviceUrl = (app as any).url || `http://${(app as any).host}:${(app as any).port}`;
             const tryCheck = async (url: string, timeoutMs: number) => {
                 const controller = new AbortController();
                 const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -100,7 +98,7 @@ export async function GET() {
                 fallback: curr.fallback
             };
             return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, { status: string; responseTime: number; fallback?: boolean }>);
 
         return NextResponse.json({ success: true, data });
     } catch (error) {

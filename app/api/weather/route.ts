@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 interface WeatherCache {
-    data: any;
+    data: unknown;
     timestamp: number;
     key: string;
 }

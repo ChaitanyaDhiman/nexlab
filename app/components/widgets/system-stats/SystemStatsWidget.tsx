@@ -3,7 +3,7 @@
 import { BaseWidget } from '../BaseWidget';
 import { WidgetProps } from '@/app/types/widgets';
 import { useSystem } from '@/app/contexts/SystemContext';
-import { Cpu, Zap, Thermometer, Fan, Clock, MemoryStick, Gpu } from 'lucide-react';
+import { Cpu, Thermometer, Fan, Clock, MemoryStick, Gpu } from 'lucide-react';
 
 export function SystemStatsWidget({ isEditMode, onRemove }: WidgetProps) {
     const { stats, loading } = useSystem();

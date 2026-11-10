@@ -308,11 +308,11 @@ def execute_update_job(job_id: str):
         if code1 != 0:
             log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Warning: apt-get update returned exit code {code1}\n")
 
-        # Step 2: apt upgrade
+        # Step 2: apt upgrade (using --with-new-pkgs so kernel updates requiring new packages aren't kept back)
         upgrade_cmd = (
             "export DEBIAN_FRONTEND=noninteractive && "
             "export NEEDRESTART_MODE=a && "
-            "apt-get -y -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
+            "apt-get -y --with-new-pkgs -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
         )
         code2, _ = run_streaming_cmd(upgrade_cmd, step_name='installing')
 

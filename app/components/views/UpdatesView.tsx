@@ -28,7 +28,6 @@ export function UpdatesView() {
     const [status, setStatus] = useState<UpdateStatusData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [checking, setChecking] = useState(false);
     const [updating, setUpdating] = useState(false);
     const [rebooting, setRebooting] = useState(false);
 
@@ -103,7 +102,6 @@ export function UpdatesView() {
                 } else if (payload.type === "done") {
                     setUpdating(false);
                     setRefreshing(false);
-                    setChecking(false);
                     if (payload.data.success) {
                         setActionMessage({ type: "success", text: "Operation completed successfully." });
                         setActiveStep("completed");
@@ -148,34 +146,7 @@ export function UpdatesView() {
         }
     }, [logs, autoScroll, showTerminal]);
 
-    // Handle "Check Updates" (live output)
-    const handleCheckUpdates = async () => {
-        setChecking(true);
-        setActionMessage(null);
-        setShowTerminal(true);
-        connectStream();
-
-        try {
-            const res = await fetch("/api/updates/refresh", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ refresh: false, stream: true }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setActionMessage({ type: "success", text: "Update check completed." });
-                await fetchStatus(false);
-            } else {
-                setActionMessage({ type: "error", text: data.error || "Failed to check updates." });
-            }
-        } catch {
-            setActionMessage({ type: "error", text: "Failed to connect to update service." });
-        } finally {
-            setChecking(false);
-        }
-    };
-
-    // Handle "Refresh Cache" (apt update live output)
+    // Handle "Refresh" (apt update live output)
     const handleRefreshRepositories = async () => {
         setRefreshing(true);
         setActionMessage(null);
@@ -277,26 +248,15 @@ export function UpdatesView() {
 
                 {/* Primary Action Buttons matching standard layout */}
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Check Updates */}
-                    <button
-                        onClick={handleCheckUpdates}
-                        disabled={checking || refreshing || updating}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors flex items-center gap-2 border border-white/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Check package list (apt list --upgradable)"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${checking ? "animate-spin text-primary" : ""}`} />
-                        <span>Check Updates</span>
-                    </button>
-
-                    {/* Refresh Cache */}
+                    {/* Refresh */}
                     <button
                         onClick={handleRefreshRepositories}
-                        disabled={checking || refreshing || updating}
+                        disabled={refreshing || updating}
                         className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors flex items-center gap-2 border border-white/10 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Run apt update to fetch fresh package lists"
+                        title="Fetch latest package updates from repositories (apt update)"
                     >
-                        <RotateCcw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
-                        <span>Refresh Cache</span>
+                        <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-primary" : ""}`} />
+                        <span>Refresh</span>
                     </button>
 
                     {/* Update System */}

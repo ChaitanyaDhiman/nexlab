@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { X, Plus, Search } from 'lucide-react';
 import { WIDGET_METADATA } from '@/app/lib/widgetRegistry';
-import { WidgetType, WidgetMetadata } from '@/app/types/widgets';
+import { WidgetType, WidgetProps } from '@/app/types/widgets';
 import { DateTimeWidget } from '@/app/components/widgets/datetime/DateTimeWidget';
 import { SystemStatsWidget } from '@/app/components/widgets/system-stats/SystemStatsWidget';
 import { StorageWidget } from '@/app/components/widgets/storage/StorageWidget';
@@ -21,7 +21,7 @@ import { NetworkWidget } from '@/app/components/widgets/network/NetworkWidget';
 import { DockerWidget } from '@/app/components/widgets/docker/DockerWidget';
 
 // Map for previews
-const PREVIEW_COMPONENTS: Record<string, React.ComponentType<any>> = {
+const PREVIEW_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
     'datetime': DateTimeWidget,
     'datetime-minimal': DateTimeWidget,
     'datetime-analog': DateTimeWidget,

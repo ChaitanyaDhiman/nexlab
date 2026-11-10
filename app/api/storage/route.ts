@@ -225,12 +225,13 @@ export async function GET() {
             },
             timestamp: new Date().toISOString(),
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Storage info error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json(
             {
                 success: false,
-                error: error.message,
+                error: errorMessage,
                 timestamp: new Date().toISOString(),
             },
             { status: 500 }

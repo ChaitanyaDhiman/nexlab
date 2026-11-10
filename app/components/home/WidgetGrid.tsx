@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ResponsiveGridLayout } from 'react-grid-layout';
+import { ResponsiveGridLayout, Layout } from 'react-grid-layout';
 import { Widget, WidgetType } from '@/app/types/widgets';
 import { useWidgets } from '@/app/contexts/WidgetContext';
 import { WIDGET_METADATA } from '@/app/lib/widgetRegistry';
@@ -48,14 +48,7 @@ interface WidgetGridProps {
     widgets: Widget[];
 }
 
-interface LayoutItem {
-    i: string;
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    [key: string]: any;
-}
+type LayoutItem = Layout[number];
 
 export function WidgetGrid({ widgets }: WidgetGridProps) {
     const { isEditMode, updateLayout, removeWidget, updateWidget } = useWidgets();
@@ -98,16 +91,15 @@ export function WidgetGrid({ widgets }: WidgetGridProps) {
         })
     };
 
-    const currentLayoutRef = useRef<any>(null);
+    const currentLayoutRef = useRef<Layout | null>(null);
 
     // ... (width/mounted effects)
 
-    const processLayoutUpdate = useCallback((layout: LayoutItem[]) => {
+    const processLayoutUpdate = useCallback((layout: Layout) => {
         if (!isEditMode) return;
 
         const updatedWidgets = widgets.map(widget => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const layoutItem = layout.find((l: any) => l.i === widget.id);
+            const layoutItem = layout.find((l: LayoutItem) => l.i === widget.id);
             if (!layoutItem) return widget;
 
             return {
@@ -131,7 +123,7 @@ export function WidgetGrid({ widgets }: WidgetGridProps) {
         isDragging.current = true;
     }, []);
 
-    const handleDragStop = useCallback((layout: any) => {
+    const handleDragStop = useCallback((layout: Layout) => {
         isDragging.current = false;
         // Trigger update with final layout
         if (currentLayoutRef.current) {
@@ -145,7 +137,7 @@ export function WidgetGrid({ widgets }: WidgetGridProps) {
         isDragging.current = true;
     }, []);
 
-    const handleResizeStop = useCallback((layout: any) => {
+    const handleResizeStop = useCallback((layout: Layout) => {
         isDragging.current = false;
         if (currentLayoutRef.current) {
             processLayoutUpdate(currentLayoutRef.current);
@@ -154,8 +146,8 @@ export function WidgetGrid({ widgets }: WidgetGridProps) {
         }
     }, [processLayoutUpdate]);
 
-    const handleLayoutChange = useCallback((currentLayout: any) => {
-        const typedLayout = currentLayout as LayoutItem[];
+    const handleLayoutChange = useCallback((currentLayout: Layout) => {
+        const typedLayout = currentLayout;
         currentLayoutRef.current = typedLayout;
 
         // Only update context if we're not actively dragging
@@ -183,7 +175,7 @@ export function WidgetGrid({ widgets }: WidgetGridProps) {
         const WidgetComponent = WIDGET_COMPONENTS[widget.type];
         if (!WidgetComponent) return null;
 
-        const handleUpdateConfig = (newConfig: any) => {
+        const handleUpdateConfig = (newConfig: Record<string, unknown>) => {
             updateWidget(widget.id, {
                 config: {
                     ...widget.config,

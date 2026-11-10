@@ -10,7 +10,7 @@ export function StorageManager() {
     const [config, setConfig] = useState<StorageConfig | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [editingDrive, setEditingDrive] = useState<StorageDrive | null>(null);
+    const [editingDrive, setEditingDrive] = useState<StorageDriveConfig | null>(null);
     const [showEditor, setShowEditor] = useState(false);
 
     useEffect(() => {
@@ -36,7 +36,7 @@ export function StorageManager() {
                 // We need to reconstruct the config object from the drives list
                 // Note: DriveInfo has extra fields like 'total', 'used' that aren't in StorageDrive (except in fallback)
                 // We'll strip those for the config state.
-                const drives = result.data.drives.map((d: any) => ({
+                const drives = result.data.drives.map((d: StorageDrive) => ({
                     id: d.id,
                     name: d.name,
                     label: d.label,
@@ -79,13 +79,13 @@ export function StorageManager() {
         }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const handleAddDrive = () => {
         setEditingDrive(null);
         setShowEditor(true);
     };
 
-    const handleEditDrive = (drive: StorageDrive) => {
+    const handleEditDrive = (drive: StorageDriveConfig) => {
         setEditingDrive(drive);
         setShowEditor(true);
     };
@@ -175,9 +175,10 @@ export function StorageManager() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {config.drives.map((drive: any) => {
-                    const Icon = (LucideIcons as any)[drive.icon] || LucideIcons.HardDrive;
-                    const isMissing = drive.found === false && drive.total === 0;
+                {config.drives.map((drive: StorageDriveConfig) => {
+                    const Icon = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[drive.icon || ''] || LucideIcons.HardDrive;
+                    const driveStatus = drive as unknown as { found?: boolean; total?: number };
+                    const isMissing = driveStatus.found === false && driveStatus.total === 0;
 
                     return (
                         <div

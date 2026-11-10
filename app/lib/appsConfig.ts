@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { AppsConfig } from '@/app/types/apps';
-import * as LucideIcons from 'lucide-react';
 import { getIconComponent as getIconComponentFromUtils } from './iconUtils';
 
 const APPS_CONFIG_PATH = path.join(process.cwd(), 'config/apps.json');

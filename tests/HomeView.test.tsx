@@ -4,9 +4,9 @@ import { HomeView } from '../app/components/views/HomeView'
 
 // Mock child components to avoid complex rendering
 jest.mock('../app/components/home/WidgetGrid', () => ({
-    WidgetGrid: ({ widgets }: any) => (
+    WidgetGrid: ({ widgets }: { widgets: Array<{ id: string; type: string }> }) => (
         <div data-testid="widget-grid">
-            {widgets.map((w: any) => <div key={w.id} data-testid={`widget-${w.id}`}>{w.type}</div>)}
+            {widgets.map((w: { id: string; type: string }) => <div key={w.id} data-testid={`widget-${w.id}`}>{w.type}</div>)}
         </div>
     )
 }));

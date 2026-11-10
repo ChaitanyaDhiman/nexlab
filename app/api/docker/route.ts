@@ -131,8 +131,8 @@ export async function GET() {
                                 container.memory = s.MemUsage.split('/')[0].trim();
                                 container.memoryLimit = s.MemUsage.split('/')[1]?.trim();
                                 // Parse NetIO "rx / tx" string into raw bytes
-                                const [rxStr, txStr] = s.NetIO.split(' / ');
-                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                const [rxStr] = s.NetIO.split(' / ');
+                                 
                                 const parseBytes = (str: string) => {
                                     if (!str) return 0;
                                     const units = { 'B': 1, 'kB': 1024, 'MB': 1024 ** 2, 'GB': 1024 ** 3, 'TB': 1024 ** 4 };

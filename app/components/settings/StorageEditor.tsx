@@ -6,18 +6,20 @@ import { X, Search } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 
 interface StorageEditorProps {
-    drive: StorageDrive | null;
+    drive: StorageDrive | StorageDriveConfig | null;
     onSave: (drive: StorageDriveConfig) => void;
     onCancel: () => void;
 }
 
 // Get all Lucide icons dynamically
 const getAllLucideIcons = () => {
-    return Object.keys(LucideIcons)
+    const icons = LucideIcons as unknown as Record<string, { $$typeof?: unknown }>;
+    return Object.keys(icons)
         .filter(
             key =>
-                typeof (LucideIcons as any)[key] === 'object' &&
-                (LucideIcons as any)[key].$$typeof &&
+                typeof icons[key] === 'object' &&
+                icons[key] !== null &&
+                Boolean(icons[key].$$typeof) &&
                 !key.startsWith('create') &&
                 !key.startsWith('Icon')
         )
@@ -41,11 +43,11 @@ export function StorageEditor({ drive, onSave, onCancel }: StorageEditorProps) {
             setName(drive.name);
             setLabel(drive.label);
             setMount(drive.mount);
-            setIcon(drive.icon);
+            setIcon(drive.icon || "HardDrive");
         }
     }, [drive]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -69,7 +71,7 @@ export function StorageEditor({ drive, onSave, onCancel }: StorageEditorProps) {
         iconName.toLowerCase().includes(iconSearch.toLowerCase())
     );
 
-    const IconComponent = (LucideIcons as any)[icon] || LucideIcons.HardDrive;
+    const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[icon] || LucideIcons.HardDrive;
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">

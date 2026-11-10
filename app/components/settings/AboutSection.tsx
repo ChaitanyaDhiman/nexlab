@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Github, Globe, Shield, Code2, Copy, Check, FileCode, Server } from 'lucide-react';
+import { Github, Shield, Code2, FileCode, Server } from 'lucide-react';
 import Link from 'next/link';
 import { metadata } from '@/app/config/metadata';
 import { motion } from 'framer-motion';
@@ -16,7 +16,6 @@ interface UpdateInfo {
 }
 
 export function AboutSection() {
-    const [copied, setCopied] = useState(false);
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [checking, setChecking] = useState(true);
 
@@ -41,12 +40,6 @@ export function AboutSection() {
 
         checkUpdates();
     }, []);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(`npm install ${metadata.appName.toLowerCase()}`);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
 
     const container = {
         hidden: { opacity: 0 },

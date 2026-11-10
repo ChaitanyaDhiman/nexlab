@@ -15,7 +15,7 @@ export function HomeView() {
     const [showWidgetPicker, setShowWidgetPicker] = useState(false);
 
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleAddWidget = (type: WidgetType, _size: { w: number, h: number }, _data?: any) => {
         const metadata = WIDGET_METADATA[type];
 

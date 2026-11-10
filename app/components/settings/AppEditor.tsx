@@ -30,8 +30,7 @@ const getAllLucideIcons = () => {
 };
 
 // Custom icons from components/icons folder
-// Custom icons from components/icons folder
-const CUSTOM_ICON_COMPONENTS: Record<string, any> = {
+const CUSTOM_ICON_COMPONENTS: Record<string, React.ComponentType<{ className?: string }>> = {
     NexLabIcon,
     OllamaIcon,
 };

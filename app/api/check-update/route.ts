@@ -59,7 +59,7 @@ export async function GET() {
             throw new Error(`GitHub API error: ${response.statusText}`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const data: GitHubRelease = await response.json();
         const latestVersionTag = data.tag_name; // e.g., "v1.0.1" or "1.0.1"
 
@@ -79,11 +79,12 @@ export async function GET() {
             url: data.html_url
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Update check failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return NextResponse.json({
             updateAvailable: false,
-            error: error.message
+            error: errorMessage
         }, { status: 500 });
     }
 }
