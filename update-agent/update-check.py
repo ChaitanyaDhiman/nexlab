@@ -170,6 +170,24 @@ def get_last_update_time() -> Optional[str]:
     return None
 
 
+def is_kernel_package(name: str) -> bool:
+    """Check if a package name belongs to the Linux kernel / headers / meta packages."""
+    name_lower = name.lower()
+    return (
+        name_lower.startswith((
+            'linux-image',
+            'linux-headers',
+            'linux-modules',
+            'linux-generic',
+            'linux-system76',
+            'linux-tools',
+            'linux-base',
+            'linux-signatures'
+        ))
+        or bool(re.match(r'^linux-[0-9]', name_lower))
+    )
+
+
 def get_upgradable_packages(stream_output: bool = False) -> Dict[str, Any]:
     """Parse upgradable packages using apt list --upgradable."""
     if stream_output:
@@ -181,13 +199,16 @@ def get_upgradable_packages(stream_output: bool = False) -> Dict[str, Any]:
         return {
             'total': 0,
             'security': 0,
+            'kernel': 0,
             'packages': [],
             'securityPackages': [],
+            'kernelPackages': [],
             'details': []
         }
 
     packages = []
     security_pkgs = []
+    kernel_pkgs = []
     details = []
 
     for line in stdout.split('\n'):
@@ -199,39 +220,49 @@ def get_upgradable_packages(stream_output: bool = False) -> Dict[str, Any]:
         if m:
             name, suite, new_ver, arch, curr_ver = m.groups()
             is_sec = 'security' in suite.lower() or 'security' in line.lower()
+            is_kern = is_kernel_package(name)
             packages.append(name)
             if is_sec:
                 security_pkgs.append(name)
+            if is_kern:
+                kernel_pkgs.append(name)
             details.append({
                 'name': name,
                 'suite': suite,
                 'newVersion': new_ver,
                 'currentVersion': curr_ver,
                 'arch': arch,
-                'isSecurity': is_sec
+                'isSecurity': is_sec,
+                'isKernel': is_kern
             })
         else:
             parts = line.split()
             if parts:
                 name_part = parts[0].split('/')[0]
                 is_sec = 'security' in line.lower()
+                is_kern = is_kernel_package(name_part)
                 packages.append(name_part)
                 if is_sec:
                     security_pkgs.append(name_part)
+                if is_kern:
+                    kernel_pkgs.append(name_part)
                 details.append({
                     'name': name_part,
                     'suite': 'unknown',
                     'newVersion': parts[1] if len(parts) > 1 else '',
                     'currentVersion': '',
                     'arch': parts[2] if len(parts) > 2 else '',
-                    'isSecurity': is_sec
+                    'isSecurity': is_sec,
+                    'isKernel': is_kern
                 })
 
     return {
         'total': len(packages),
         'security': len(security_pkgs),
+        'kernel': len(kernel_pkgs),
         'packages': packages,
         'securityPackages': security_pkgs,
+        'kernelPackages': kernel_pkgs,
         'details': details
     }
 
@@ -271,8 +302,10 @@ def collect_current_status(refresh_lists: bool = False, stream_output: bool = Fa
         'upgrades': {
             'total': upgrades['total'],
             'security': upgrades['security'],
+            'kernel': upgrades.get('kernel', 0),
             'allPackages': upgrades['packages'],
             'securityPackages': upgrades['securityPackages'],
+            'kernelPackages': upgrades.get('kernelPackages', []),
             'details': upgrades['details']
         },
         'reboot': reboot,
@@ -286,7 +319,7 @@ def collect_current_status(refresh_lists: bool = False, stream_output: bool = Fa
     return status
 
 
-def execute_update_job(job_id: str):
+def execute_update_job(job_id: str, include_kernel: bool = True):
     """Run the complete system update sequence with real-time log capture."""
     global job_state
 
@@ -300,7 +333,7 @@ def execute_update_job(job_id: str):
         job_state['error'] = None
 
         log_line(f"\n[{datetime.now().strftime('%H:%M:%S')}] ═════════════════════════════════════════════════════════════\n")
-        log_line(f"[{datetime.now().strftime('%H:%M:%S')}] Starting System Update: apt update && apt upgrade && autoremove\n")
+        log_line(f"[{datetime.now().strftime('%H:%M:%S')}] Starting System Update (include_kernel={include_kernel})\n")
         log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ═════════════════════════════════════════════════════════════\n\n")
 
         # Step 1: apt update
@@ -308,12 +341,22 @@ def execute_update_job(job_id: str):
         if code1 != 0:
             log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Warning: apt-get update returned exit code {code1}\n")
 
-        # Step 2: apt upgrade (using --with-new-pkgs so kernel updates requiring new packages aren't kept back)
-        upgrade_cmd = (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "export NEEDRESTART_MODE=a && "
-            "apt-get -y --with-new-pkgs -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
-        )
+        # Step 2: apt upgrade
+        if include_kernel:
+            upgrade_cmd = (
+                "export DEBIAN_FRONTEND=noninteractive && "
+                "export NEEDRESTART_MODE=a && "
+                "apt-get -y --with-new-pkgs -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
+            )
+            log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚙️ Executing system upgrade (including kernel updates via --with-new-pkgs)...\n")
+        else:
+            upgrade_cmd = (
+                "export DEBIAN_FRONTEND=noninteractive && "
+                "export NEEDRESTART_MODE=a && "
+                "apt-get -y -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
+            )
+            log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚙️ Executing standard system upgrade (skipping kernel packages)...\n")
+
         code2, _ = run_streaming_cmd(upgrade_cmd, step_name='installing')
 
         # Step 3: autoremove
@@ -405,6 +448,10 @@ class CheckRequest(BaseModel):
     stream: bool = True
 
 
+class UpdateRequest(BaseModel):
+    includeKernel: bool = True
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "hasNsenter": HAS_NSENTER}
@@ -427,7 +474,7 @@ def check_updates(req: CheckRequest = CheckRequest()):
 
 
 @app.post("/update")
-def start_update(background_tasks: BackgroundTasks):
+def start_update(background_tasks: BackgroundTasks, req: UpdateRequest = UpdateRequest()):
     """Initiate the system update sequence in the background."""
     if job_state['status'] == 'running':
         return JSONResponse(
@@ -436,9 +483,9 @@ def start_update(background_tasks: BackgroundTasks):
         )
 
     job_id = f"upd-{int(time.time())}"
-    background_tasks.add_task(execute_update_job, job_id)
+    background_tasks.add_task(execute_update_job, job_id, req.includeKernel)
     return JSONResponse(
-        content={"success": True, "message": "System update initiated.", "jobId": job_id}
+        content={"success": True, "message": "System update initiated.", "jobId": job_id, "includeKernel": req.includeKernel}
     )
 
 

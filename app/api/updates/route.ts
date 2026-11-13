@@ -18,6 +18,7 @@ export interface PackageDetail {
     currentVersion?: string;
     arch?: string;
     isSecurity: boolean;
+    isKernel?: boolean;
 }
 
 export interface UpdateJobState {
@@ -36,12 +37,29 @@ export interface UpdateStatusData {
     lastUpdateCheck: string | null;
     updatesAvailable: number;
     securityUpdates: number;
+    kernelUpdates?: number;
     lastUpdateLog: string[];
     updatePackages: string[];
     securityPackagesList: string[];
+    kernelPackagesList?: string[];
     packageDetails: PackageDetail[];
     job?: UpdateJobState;
     hasNsenter?: boolean;
+}
+
+export function isKernelPackage(name: string): boolean {
+    const n = name.toLowerCase();
+    return (
+        n.startsWith('linux-image') ||
+        n.startsWith('linux-headers') ||
+        n.startsWith('linux-modules') ||
+        n.startsWith('linux-generic') ||
+        n.startsWith('linux-system76') ||
+        n.startsWith('linux-tools') ||
+        n.startsWith('linux-base') ||
+        n.startsWith('linux-signatures') ||
+        /^linux-[0-9]/.test(n)
+    );
 }
 
 async function safeExec(command: string, fallback: string = ''): Promise<string> {
@@ -73,6 +91,8 @@ async function fetchFromAgent(): Promise<UpdateStatusData | null> {
             const data = json.data;
             const upgrades = data.upgrades || {};
             const reboot = data.reboot || {};
+            const kernelUpdates = upgrades.kernel ?? (upgrades.details ? upgrades.details.filter((p: PackageDetail) => p.isKernel).length : 0);
+            const kernelPackagesList = upgrades.kernelPackages || (upgrades.details ? upgrades.details.filter((p: PackageDetail) => p.isKernel).map((p: PackageDetail) => p.name) : []);
 
             return {
                 rebootRequired: reboot.required || false,
@@ -80,9 +100,11 @@ async function fetchFromAgent(): Promise<UpdateStatusData | null> {
                 lastUpdateCheck: data.lastUpdateCheck || null,
                 updatesAvailable: upgrades.total || 0,
                 securityUpdates: upgrades.security || 0,
+                kernelUpdates,
                 lastUpdateLog: data.job?.error ? [data.job.error] : ['Update agent connected'],
                 updatePackages: upgrades.allPackages || [],
                 securityPackagesList: upgrades.securityPackages || [],
+                kernelPackagesList,
                 packageDetails: upgrades.details || [],
                 job: data.job,
                 hasNsenter: data.hasNsenter ?? true,
@@ -105,6 +127,8 @@ function readAgentFileStatus(): UpdateStatusData | null {
             const parsed = JSON.parse(content) as any;
             const upgrades = parsed.upgrades || {};
             const reboot = parsed.reboot || {};
+            const kernelUpdates = upgrades.kernel ?? (upgrades.details ? upgrades.details.filter((p: PackageDetail) => p.isKernel).length : 0);
+            const kernelPackagesList = upgrades.kernelPackages || (upgrades.details ? upgrades.details.filter((p: PackageDetail) => p.isKernel).map((p: PackageDetail) => p.name) : []);
 
             return {
                 rebootRequired: reboot.required || false,
@@ -112,9 +136,11 @@ function readAgentFileStatus(): UpdateStatusData | null {
                 lastUpdateCheck: parsed.lastUpdateCheck || null,
                 updatesAvailable: upgrades.total || 0,
                 securityUpdates: upgrades.security || 0,
+                kernelUpdates,
                 lastUpdateLog: ['Read from shared volume cache'],
                 updatePackages: upgrades.allPackages || [],
                 securityPackagesList: upgrades.securityPackages || [],
+                kernelPackagesList,
                 packageDetails: upgrades.details || [],
                 job: parsed.job,
                 hasNsenter: parsed.hasNsenter,
@@ -136,6 +162,7 @@ async function getDirectHostStatus(): Promise<UpdateStatusData> {
 
         const packages: string[] = [];
         const securityPkgs: string[] = [];
+        const kernelPkgs: string[] = [];
         const details: PackageDetail[] = [];
 
         for (const line of lines) {
@@ -146,21 +173,26 @@ async function getDirectHostStatus(): Promise<UpdateStatusData> {
             if (m) {
                 const [, name, suite, newVersion, arch, currentVersion] = m;
                 const isSec = suite.toLowerCase().includes('security') || trimmed.toLowerCase().includes('security');
+                const isKern = isKernelPackage(name);
                 packages.push(name);
                 if (isSec) securityPkgs.push(name);
-                details.push({ name, suite, newVersion, currentVersion, arch, isSecurity: isSec });
+                if (isKern) kernelPkgs.push(name);
+                details.push({ name, suite, newVersion, currentVersion, arch, isSecurity: isSec, isKernel: isKern });
             } else {
                 const parts = trimmed.split(/\s+/);
                 if (parts.length > 0) {
                     const namePart = parts[0].split('/')[0];
                     const isSec = trimmed.toLowerCase().includes('security');
+                    const isKern = isKernelPackage(namePart);
                     packages.push(namePart);
                     if (isSec) securityPkgs.push(namePart);
+                    if (isKern) kernelPkgs.push(namePart);
                     details.push({
                         name: namePart,
                         newVersion: parts[1] || '',
                         arch: parts[2] || '',
-                        isSecurity: isSec
+                        isSecurity: isSec,
+                        isKernel: isKern,
                     });
                 }
             }
@@ -192,9 +224,11 @@ async function getDirectHostStatus(): Promise<UpdateStatusData> {
             lastUpdateCheck: lastCheck || null,
             updatesAvailable: packages.length,
             securityUpdates: securityPkgs.length,
+            kernelUpdates: kernelPkgs.length,
             lastUpdateLog: ['Direct host inspection'],
             updatePackages: packages,
             securityPackagesList: securityPkgs,
+            kernelPackagesList: kernelPkgs,
             packageDetails: details,
         };
     } catch {
@@ -204,9 +238,11 @@ async function getDirectHostStatus(): Promise<UpdateStatusData> {
             lastUpdateCheck: null,
             updatesAvailable: 0,
             securityUpdates: 0,
+            kernelUpdates: 0,
             lastUpdateLog: ['Unable to read updates'],
             updatePackages: [],
             securityPackagesList: [],
+            kernelPackagesList: [],
             packageDetails: [],
         };
     }

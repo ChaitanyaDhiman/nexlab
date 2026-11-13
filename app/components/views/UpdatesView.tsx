@@ -39,7 +39,8 @@ export function UpdatesView() {
 
     // Filter & Search state
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterCategory, setFilterCategory] = useState<"all" | "security" | "standard">("all");
+    const [filterCategory, setFilterCategory] = useState<"all" | "security" | "standard" | "kernel">("all");
+    const [includeKernel, setIncludeKernel] = useState(false);
     const [copiedPkg, setCopiedPkg] = useState<string | null>(null);
 
     // Modals & messages
@@ -184,7 +185,11 @@ export function UpdatesView() {
         connectStream();
 
         try {
-            const res = await fetch("/api/updates/apply", { method: "POST" });
+            const res = await fetch("/api/updates/apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ includeKernel }),
+            });
             const data = await res.json();
             if (!data.success && res.status !== 409) {
                 setActionMessage({ type: "error", text: data.error || data.message || "Failed to trigger update." });
@@ -228,13 +233,17 @@ export function UpdatesView() {
 
         if (!matchesSearch) return false;
         if (filterCategory === "security") return pkg.isSecurity;
-        if (filterCategory === "standard") return !pkg.isSecurity;
+        if (filterCategory === "kernel") return !!pkg.isKernel;
+        if (filterCategory === "standard") return !pkg.isSecurity && !pkg.isKernel;
         return true;
     });
 
     const totalCount = status?.updatesAvailable || 0;
     const securityCount = status?.securityUpdates || 0;
-    const standardCount = Math.max(0, totalCount - securityCount);
+    const kernelCount = status?.kernelUpdates ?? allPackages.filter((p) => p.isKernel).length;
+    const standardCount = allPackages.length > 0
+        ? allPackages.filter((p) => !p.isSecurity && !p.isKernel).length
+        : Math.max(0, totalCount - securityCount);
     const rebootRequired = status?.rebootRequired || false;
 
     return (
@@ -338,7 +347,7 @@ export function UpdatesView() {
             )}
 
             {/* Overview Metric Cards matching SettingsView / AppTile style */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-2 ${kernelCount > 0 ? "lg:grid-cols-5" : "md:grid-cols-4"} gap-4`}>
                 {/* Total Updates */}
                 <div className="bg-surface/50 border border-white/5 rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between">
                     <div className="flex items-center justify-between text-gray-400">
@@ -368,6 +377,22 @@ export function UpdatesView() {
                         )}
                     </div>
                 </div>
+
+                {/* Kernel Updates */}
+                {kernelCount > 0 && (
+                    <div className="bg-surface/50 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between">
+                        <div className="flex items-center justify-between text-gray-400">
+                            <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Kernel Updates</span>
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div className="mt-4 flex items-baseline gap-2">
+                            <span className="text-3xl font-bold text-amber-400">{kernelCount}</span>
+                            <span className="text-xs font-semibold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                Optional
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Standard Updates */}
                 <div className="bg-surface/50 border border-white/5 rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between">
@@ -422,6 +447,17 @@ export function UpdatesView() {
                             Security ({securityCount})
                             {filterCategory === "security" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-400" />}
                         </button>
+                        {kernelCount > 0 && (
+                            <button
+                                onClick={() => setFilterCategory("kernel")}
+                                className={`px-3 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                                    filterCategory === "kernel" ? "text-amber-400" : "text-gray-400 hover:text-white"
+                                }`}
+                            >
+                                Kernel ({kernelCount})
+                                {filterCategory === "kernel" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
+                            </button>
+                        )}
                         <button
                             onClick={() => setFilterCategory("standard")}
                             className={`px-3 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
@@ -487,12 +523,18 @@ export function UpdatesView() {
 
                                     {/* Urgency Badge */}
                                     <div className="shrink-0 flex items-center gap-1.5">
+                                        {pkg.isKernel && (
+                                            <span className="text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                Kernel
+                                            </span>
+                                        )}
                                         {pkg.isSecurity ? (
                                             <span className="text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                                                 <ShieldAlert className="w-3 h-3" />
                                                 Security
                                             </span>
-                                        ) : (
+                                        ) : !pkg.isKernel && (
                                             <span className="text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full">
                                                 Update
                                             </span>
@@ -625,7 +667,7 @@ export function UpdatesView() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="w-full max-w-md rounded-2xl bg-surface border border-white/10 p-6 shadow-2xl space-y-4"
+                            className="w-full max-w-lg rounded-2xl bg-surface border border-white/10 p-6 shadow-2xl space-y-4"
                         >
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center">
@@ -644,10 +686,41 @@ export function UpdatesView() {
                                 )}.
                             </p>
 
+                            {/* Kernel Warning & Toggle Prompt */}
+                            {kernelCount > 0 && (
+                                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                        <div className="text-xs space-y-1">
+                                            <p className="font-semibold text-amber-300">
+                                                Kernel Updates Available ({kernelCount} package{kernelCount > 1 ? "s" : ""})
+                                            </p>
+                                            <p className="text-amber-200/80 leading-relaxed">
+                                                Kernel installations trigger initramfs creation and DKMS module builds, which take 1–3 mins extra and will require a system reboot.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <label className="flex items-center gap-2.5 pt-1 text-xs font-medium text-white cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeKernel}
+                                            onChange={(e) => setIncludeKernel(e.target.checked)}
+                                            className="w-4 h-4 rounded border-amber-500/40 text-amber-500 focus:ring-amber-500/30 bg-surface accent-amber-500"
+                                        />
+                                        <span className="text-gray-200">
+                                            Include Kernel Updates ({includeKernel ? "Enabled - requires reboot" : "Excluded - fast upgrade, no reboot"})
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+
                             <div className="p-3 rounded-lg bg-white/5 border border-white/5 text-xs text-gray-400 font-mono space-y-1">
                                 <div>Command to execute:</div>
                                 <div className="text-primary truncate">
-                                    sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y
+                                    {includeKernel && kernelCount > 0
+                                        ? "sudo apt update && sudo apt upgrade -y --with-new-pkgs && sudo apt autoremove -y"
+                                        : "sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y"}
                                 </div>
                             </div>
 

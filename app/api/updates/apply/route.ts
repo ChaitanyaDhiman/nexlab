@@ -9,13 +9,27 @@ const UPDATE_AGENT_URL = process.env.UPDATE_AGENT_URL || (fs.existsSync('/.docke
  * POST /api/updates/apply
  * Triggers the system update job (apt update && apt upgrade -y && apt autoremove -y)
  */
-export async function POST() {
+export async function POST(req: Request) {
     try {
+        let includeKernel = false;
+        try {
+            const body = await req.json();
+            if (typeof body?.includeKernel === 'boolean') {
+                includeKernel = body.includeKernel;
+            }
+        } catch {
+            // body was empty or not JSON, default to false
+        }
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(`${UPDATE_AGENT_URL}/update`, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ includeKernel }),
             signal: controller.signal,
         });
         clearTimeout(timeoutId);
