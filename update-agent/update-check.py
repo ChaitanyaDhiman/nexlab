@@ -341,7 +341,13 @@ def execute_update_job(job_id: str, include_kernel: bool = True):
         if code1 != 0:
             log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Warning: apt-get update returned exit code {code1}\n")
 
-        # Step 2: apt upgrade
+        # Step 2: Pre-flight check - resolve any previously interrupted dpkg transactions
+        log_line(f"[{datetime.now().strftime('%H:%M:%S')}] 🔧 Checking package manager status (dpkg --configure -a)...\n")
+        code_cfg, _ = run_streaming_cmd('export DEBIAN_FRONTEND=noninteractive && dpkg --configure -a', step_name='configuring')
+        if code_cfg != 0:
+            log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Warning: dpkg --configure -a returned exit code {code_cfg}\n")
+
+        # Step 3: apt upgrade
         if include_kernel:
             upgrade_cmd = (
                 "export DEBIAN_FRONTEND=noninteractive && "
@@ -359,7 +365,16 @@ def execute_update_job(job_id: str, include_kernel: bool = True):
 
         code2, _ = run_streaming_cmd(upgrade_cmd, step_name='installing')
 
-        # Step 3: autoremove
+        # Step 3.5: If upgrade failed (e.g. interrupted dpkg or broken dependencies), attempt auto-repair and retry once
+        if code2 != 0:
+            log_line(f"\n[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Upgrade encountered code {code2}. Running auto-repair (dpkg --configure -a && apt-get --fix-broken install)...\n")
+            fix_cmd = "export DEBIAN_FRONTEND=noninteractive && dpkg --configure -a && apt-get -y --fix-broken install"
+            code_fix, _ = run_streaming_cmd(fix_cmd, step_name='repairing')
+            if code_fix == 0:
+                log_line(f"[{datetime.now().strftime('%H:%M:%S')}] 🔄 Auto-repair successful. Retrying upgrade...\n")
+                code2, _ = run_streaming_cmd(upgrade_cmd, step_name='installing')
+
+        # Step 4: autoremove
         if code2 == 0:
             run_streaming_cmd('export DEBIAN_FRONTEND=noninteractive && apt-get -y autoremove', step_name='cleaning')
 
@@ -384,6 +399,54 @@ def execute_update_job(job_id: str, include_kernel: bool = True):
         # Final status check
         try:
             collect_current_status(refresh_lists=False, stream_output=False)
+        except Exception:
+            pass
+
+
+def execute_repair_job(job_id: str):
+    """Run package manager repair: dpkg --configure -a && apt-get -y --fix-broken install."""
+    global job_state
+
+    with update_lock:
+        job_state['id'] = job_id
+        job_state['status'] = 'running'
+        job_state['step'] = 'repairing'
+        job_state['startedAt'] = datetime.now(timezone.utc).isoformat()
+        job_state['finishedAt'] = None
+        job_state['exitCode'] = None
+        job_state['error'] = None
+
+        log_line(f"\n[{datetime.now().strftime('%H:%M:%S')}] ═════════════════════════════════════════════════════════════\n")
+        log_line(f"[{datetime.now().strftime('%H:%M:%S')}] Starting Package Manager Repair (dpkg --configure -a)\n")
+        log_line(f"[{datetime.now().strftime('%H:%M:%S')}] ═════════════════════════════════════════════════════════════\n\n")
+
+        repair_cmd = (
+            "export DEBIAN_FRONTEND=noninteractive && "
+            "dpkg --configure -a && "
+            "apt-get -y --fix-broken install"
+        )
+        code, _ = run_streaming_cmd(repair_cmd, step_name='repairing')
+
+        exit_code = code
+        job_state['exitCode'] = exit_code
+        job_state['finishedAt'] = datetime.now(timezone.utc).isoformat()
+
+        if exit_code == 0:
+            job_state['status'] = 'success'
+            job_state['step'] = 'completed'
+            log_line(f"\n[{datetime.now().strftime('%H:%M:%S')}] ✅ Package manager repair completed successfully!\n")
+            broadcast_event('step', {'step': 'completed', 'message': 'Package manager repaired successfully!'})
+            broadcast_event('done', {'success': True, 'exitCode': 0})
+        else:
+            job_state['status'] = 'error'
+            job_state['step'] = 'failed'
+            job_state['error'] = f"Repair failed with exit code {exit_code}"
+            log_line(f"\n[{datetime.now().strftime('%H:%M:%S')}] ❌ Repair failed with code {exit_code}\n")
+            broadcast_event('step', {'step': 'failed', 'message': f"Repair failed with code {exit_code}"})
+            broadcast_event('done', {'success': False, 'exitCode': exit_code, 'error': job_state['error']})
+
+        try:
+            collect_current_status(refresh_lists=True, stream_output=False)
         except Exception:
             pass
 
@@ -486,6 +549,22 @@ def start_update(background_tasks: BackgroundTasks, req: UpdateRequest = UpdateR
     background_tasks.add_task(execute_update_job, job_id, req.includeKernel)
     return JSONResponse(
         content={"success": True, "message": "System update initiated.", "jobId": job_id, "includeKernel": req.includeKernel}
+    )
+
+
+@app.post("/repair")
+def repair_packages(background_tasks: BackgroundTasks):
+    """Trigger dpkg --configure -a and apt-get --fix-broken install in the background."""
+    if job_state['status'] == 'running':
+        return JSONResponse(
+            content={"success": False, "message": "A job is already running.", "job": job_state},
+            status_code=409
+        )
+
+    job_id = f"fix-{int(time.time())}"
+    background_tasks.add_task(execute_repair_job, job_id)
+    return JSONResponse(
+        content={"success": True, "message": "Package manager repair initiated.", "jobId": job_id}
     )
 
 

@@ -20,7 +20,8 @@ import {
     ChevronDown,
     ChevronUp,
     Trash2,
-    CheckCircle
+    CheckCircle,
+    Wrench
 } from "lucide-react";
 import { UpdateStatusData } from "@/app/api/updates/route";
 
@@ -30,6 +31,7 @@ export function UpdatesView() {
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
     const [rebooting, setRebooting] = useState(false);
+    const [repairing, setRepairing] = useState(false);
 
     // Terminal / Stream state
     const [logs, setLogs] = useState<string[]>([]);
@@ -103,6 +105,7 @@ export function UpdatesView() {
                 } else if (payload.type === "done") {
                     setUpdating(false);
                     setRefreshing(false);
+                    setRepairing(false);
                     if (payload.data.success) {
                         setActionMessage({ type: "success", text: "Operation completed successfully." });
                         setActiveStep("completed");
@@ -198,6 +201,28 @@ export function UpdatesView() {
         } catch {
             setActionMessage({ type: "error", text: "Failed to trigger update job." });
             setUpdating(false);
+        }
+    };
+
+    // Handle "Repair Package Manager" (dpkg --configure -a && apt-get --fix-broken install)
+    const handleRepair = async () => {
+        setRepairing(true);
+        setShowTerminal(true);
+        setLogs([]);
+        setActiveStep("repairing");
+        setActionMessage({ type: "info", text: "Starting package manager repair (dpkg --configure -a)..." });
+        connectStream();
+
+        try {
+            const res = await fetch("/api/updates/repair", { method: "POST" });
+            const data = await res.json();
+            if (!data.success && res.status !== 409) {
+                setActionMessage({ type: "error", text: data.error || data.message || "Failed to trigger repair." });
+                setRepairing(false);
+            }
+        } catch {
+            setActionMessage({ type: "error", text: "Failed to contact repair service." });
+            setRepairing(false);
         }
     };
 
@@ -306,12 +331,25 @@ export function UpdatesView() {
                             {actionMessage.type === "info" && <RefreshCw className="w-4 h-4 text-primary animate-spin shrink-0" />}
                             <span>{actionMessage.text}</span>
                         </div>
-                        <button
-                            onClick={() => setActionMessage(null)}
-                            className="p-1 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {actionMessage.type === "error" && (
+                                <button
+                                    onClick={handleRepair}
+                                    disabled={repairing || updating}
+                                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 transition-colors flex items-center gap-1.5 shrink-0"
+                                    title="Auto-resolve interrupted package status (dpkg --configure -a)"
+                                >
+                                    <Wrench className={`w-3.5 h-3.5 ${repairing ? "animate-spin" : ""}`} />
+                                    <span>{repairing ? "Repairing..." : "Repair DPKG"}</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setActionMessage(null)}
+                                className="p-1 hover:bg-white/10 rounded-md transition-colors text-gray-400 hover:text-white"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -607,6 +645,15 @@ export function UpdatesView() {
                         >
                             Scroll: {autoScroll ? "ON" : "OFF"}
                         </button>
+                        <button
+                            onClick={handleRepair}
+                            disabled={repairing || updating}
+                            className="text-[11px] text-amber-400 hover:text-amber-300 px-2 py-0.5 rounded hover:bg-amber-500/10 border border-amber-500/20 transition-colors flex items-center gap-1.5"
+                            title="Repair interrupted package manager state (dpkg --configure -a)"
+                        >
+                            <Wrench className={`w-3 h-3 ${repairing ? "animate-spin" : ""}`} />
+                            <span>Repair DPKG</span>
+                        </button>
                         {logs.length > 0 && (
                             <button
                                 onClick={() => setLogs([])}
@@ -635,11 +682,20 @@ export function UpdatesView() {
                             <div className="mb-3 p-3 rounded-lg bg-surface/80 border border-white/5 flex items-center justify-between text-[11px] text-gray-400">
                                 <span className={activeStep === "refreshing" ? "text-primary font-semibold" : ""}>1. apt update</span>
                                 <ArrowRight className="w-3 h-3 text-gray-600" />
-                                <span className={activeStep === "installing" ? "text-primary font-semibold" : ""}>2. apt upgrade</span>
+                                <span className={activeStep === "configuring" ? "text-primary font-semibold" : ""}>2. dpkg check</span>
                                 <ArrowRight className="w-3 h-3 text-gray-600" />
-                                <span className={activeStep === "cleaning" ? "text-primary font-semibold" : ""}>3. autoremove</span>
+                                <span className={activeStep === "installing" ? "text-primary font-semibold" : ""}>3. apt upgrade</span>
                                 <ArrowRight className="w-3 h-3 text-gray-600" />
-                                <span className={activeStep === "completed" ? "text-emerald-400 font-semibold" : ""}>4. Done</span>
+                                <span className={activeStep === "cleaning" ? "text-primary font-semibold" : ""}>4. autoremove</span>
+                                <ArrowRight className="w-3 h-3 text-gray-600" />
+                                <span className={activeStep === "completed" ? "text-emerald-400 font-semibold" : ""}>5. Done</span>
+                            </div>
+                        )}
+
+                        {repairing && (
+                            <div className="mb-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-300">
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                                <span>Running package manager repair: dpkg --configure -a & apt-get -y --fix-broken install...</span>
                             </div>
                         )}
 
